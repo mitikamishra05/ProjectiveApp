@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Projectile Motion Simulator</title>
+    <meta name="description" content="Interactive projectile motion simulator with gravity presets for different planets." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Projectile Motion Simulator</h1>
+      <p class="sub">Adjust angle, speed, and gravity (try different planets) — then launch!</p>
+    </header>
+
+    <main class="app">
+      <section class="panel controls" aria-label="Controls">
+        <div class="control-row">
+          <label for="angle">Angle (°)</label>
+          <div class="control-input">
+            <input id="angle" type="range" min="0" max="90" step="1" value="45" />
+            <output id="angleOut">45°</output>
+          </div>
+        </div>
+
+        <div class="control-row">
+          <label for="speed">Initial speed (m/s)</label>
+          <div class="control-input">
+            <input id="speed" type="range" min="5" max="120" step="1" value="40" />
+            <output id="speedOut">40 m/s</output>
+          </div>
+        </div>
+
+        <div class="control-row">
+          <label for="planet">Gravity (m/s²)</label>
+          <div class="control-input select-row">
+            <select id="planet" aria-label="Planet gravity preset">
+              <option value="Mercury">Mercury (3.70)</option>
+              <option value="Venus">Venus (8.87)</option>
+              <option value="Earth" selected>Earth (9.81)</option>
+              <option value="Moon">Moon (1.62)</option>
+              <option value="Mars">Mars (3.71)</option>
+              <option value="Jupiter">Jupiter (24.79)</option>
+              <option value="Saturn">Saturn (10.44)</option>
+              <option value="Uranus">Uranus (8.69)</option>
+              <option value="Neptune">Neptune (11.15)</option>
+              <option value="Pluto">Pluto (0.62)</option>
+              <option value="Custom">Custom…</option>
+            </select>
+            <input id="customG" type="number" step="0.01" min="0" value="9.81" disabled aria-label="Custom gravity value" />
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button id="launch" class="btn primary" type="button">Launch</button>
+          <button id="pause" class="btn" type="button" disabled>Pause</button>
+          <button id="reset" class="btn ghost" type="button" disabled>Reset</button>
+        </div>
+
+        <div class="stats" aria-live="polite">
+          <div><span class="label">g:</span> <span id="gOut">9.81</span> m/s²</div>
+          <div><span class="label">Time of flight:</span> <span id="tOut">—</span> s</div>
+          <div><span class="label">Max height:</span> <span id="hOut">—</span> m</div>
+          <div><span class="label">Range:</span> <span id="rOut">—</span> m</div>
+        </div>
+      </section>
+
+      <section class="panel stage" aria-label="Simulation canvas">
+        <canvas id="canvas" width="1200" height="700" aria-label="Projectile canvas"></canvas>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>Tip: Try Moon or Jupiter to see drastic differences. Drag the window size to see responsive scaling.</p>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
+
