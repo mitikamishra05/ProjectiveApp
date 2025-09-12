@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Simulations • Projectile Motion App</title>
+    <meta name="description" content="List of your saved projectile simulations." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root { --bg:#0b1020; --panel:rgba(18,25,48,0.85); --panel-border:rgba(255,255,255,0.08); --text:#e6e9f0; --muted:#a9b1c3; --primary:#6aa6ff; --primary-700:#4a8bf3; --danger:#ff647c; --success:#45d483; }
+      *{box-sizing:border-box} html,body{height:100%}
+      body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);background:radial-gradient(1200px 800px at 70% 10%,#1c2448 0%,#0b1020 60%,#050814 100%)}
+      header{padding:16px;text-align:center}
+      header h1{margin:0}
+      header .sub{color:var(--muted)}
+      .wrap{max-width:1000px;margin:0 auto;padding:16px}
+      .bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;color:var(--muted)}
+      .btn{padding:10px 12px;border-radius:12px;border:1px solid var(--panel-border);background:rgba(255,255,255,.06);color:var(--text);cursor:pointer}
+      .btn.primary{background:linear-gradient(180deg,var(--primary) 0%,var(--primary-700) 100%);border-color:transparent}
+      .card{background:var(--panel);border:1px solid var(--panel-border);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      .row{display:flex;gap:8px;color:var(--muted)}
+      .empty{color:var(--muted);text-align:center;margin-top:24px}
+      a{color:#9cc4ff}
+      @media (max-width: 800px){ .grid{ grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>My Simulations</h1>
+      <p class="sub">Saved results for your account</p>
+    </header>
+    <div class="wrap" id="appRoot" hidden>
+      <div class="bar">
+        <div id="userEmail">Signed in</div>
+        <div>
+          <a class="btn" href="index.html">Back to Simulator</a>
+          <button id="signOut" class="btn" type="button">Sign out</button>
+        </div>
+      </div>
+
+      <div id="list" class="grid"></div>
+      <div id="empty" class="empty" hidden>No saved simulations yet.</div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { getFirestore, collection, query, where, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY',
+        authDomain: 'YOUR_AUTH_DOMAIN',
+        projectId: 'YOUR_PROJECT_ID',
+        storageBucket: 'YOUR_STORAGE_BUCKET',
+        messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+        appId: 'YOUR_APP_ID',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      const appRoot = document.getElementById('appRoot');
+      const userEmailEl = document.getElementById('userEmail');
+      const signOutBtn = document.getElementById('signOut');
+      const listEl = document.getElementById('list');
+      const emptyEl = document.getElementById('empty');
+
+      onAuthStateChanged(auth, (user) => {
+        if (!user) { window.location.replace('login.html'); return; }
+        userEmailEl.textContent = user.email || 'Signed in';
+        appRoot.hidden = false;
+        loadSims(user.uid);
+      });
+
+      signOutBtn.addEventListener('click', async () => { await signOut(auth); window.location.replace('login.html'); });
+
+      function loadSims(uid){
+        const q = query(collection(db, 'simulations'), where('uid', '==', uid), orderBy('createdAt', 'desc'));
+        onSnapshot(q, (snap) => {
+          listEl.innerHTML = '';
+          if (snap.empty) { emptyEl.hidden = false; return; }
+          emptyEl.hidden = true;
+          snap.forEach((doc) => {
+            const d = doc.data();
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+              <div class="row"><strong>Angle:</strong> ${fmt(d.angle)}°</div>
+              <div class="row"><strong>Speed:</strong> ${fmt(d.speed)} m/s</div>
+              <div class="row"><strong>Gravity:</strong> ${fmt(d.gravity)} m/s²</div>
+              <div class="row"><strong>Time:</strong> ${fmt(d.time)} s</div>
+              <div class="row"><strong>Height:</strong> ${fmt(d.height)} m</div>
+              <div class="row"><strong>Range:</strong> ${fmt(d.range)} m</div>
+            `;
+            listEl.appendChild(card);
+          });
+        });
+      }
+
+      function fmt(n){ return (n===undefined||n===null) ? '—' : Number(n).toFixed(2); }
+    </script>
+  </body>
+</html>
+
