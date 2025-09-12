@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login • Projectile Motion App</title>
+    <meta name="description" content="Login to access the projectile motion simulator." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: rgba(18, 25, 48, 0.85);
+        --panel-border: rgba(255, 255, 255, 0.08);
+        --text: #e6e9f0;
+        --muted: #a9b1c3;
+        --primary: #6aa6ff;
+        --primary-700: #4a8bf3;
+        --danger: #ff647c;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        color: var(--text);
+        background: radial-gradient(1200px 800px at 70% 10%, #1c2448 0%, #0b1020 60%, #050814 100%);
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 420px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 10px 36px rgba(0,0,0,0.45);
+        backdrop-filter: blur(6px);
+      }
+      h1 { margin: 0 0 4px 0; font-size: 22px; }
+      p.sub { margin: 0 0 18px 0; color: var(--muted); }
+      label { display: block; font-weight: 600; margin-bottom: 8px; }
+      input[type=email], input[type=password] {
+        width: 100%;
+        padding: 12px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--panel-border);
+        background: rgba(255,255,255,0.06);
+        color: var(--text);
+        outline: none;
+      }
+      .field { margin-bottom: 14px; }
+      .btn {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(180deg, var(--primary) 0%, var(--primary-700) 100%);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .error { color: var(--danger); min-height: 20px; margin-top: 10px; }
+      .foot { margin-top: 14px; color: var(--muted); font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>Welcome back</h1>
+      <p class="sub">Sign in to use the simulator</p>
+      <form id="loginForm">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn" type="submit" id="signinBtn">Sign in</button>
+        <div id="error" class="error" aria-live="polite"></div>
+      </form>
+      <div class="foot">Tip: Add your GitHub Pages domain to Firebase Auth authorized domains.</div>
+    </main>
+
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+      // Replace these placeholders with your real config from Firebase Console
+      const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY',
+        authDomain: 'YOUR_AUTH_DOMAIN',
+        projectId: 'YOUR_PROJECT_ID',
+        storageBucket: 'YOUR_STORAGE_BUCKET',
+        messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+        appId: 'YOUR_APP_ID',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+      // If already signed in, go to app
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          window.location.replace('index.html');
+        }
+      });
+
+      const form = document.getElementById('loginForm');
+      const emailEl = document.getElementById('email');
+      const passEl = document.getElementById('password');
+      const errEl = document.getElementById('error');
+      const btn = document.getElementById('signinBtn');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.textContent = '';
+        btn.disabled = true;
+        try {
+          const email = emailEl.value.trim();
+          const password = passEl.value;
+          await signInWithEmailAndPassword(auth, email, password);
+          window.location.replace('index.html');
+        } catch (err) {
+          console.error(err);
+          errEl.textContent = mapAuthError(err?.code || 'auth/error');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      function mapAuthError(code) {
+        switch (code) {
+          case 'auth/invalid-email': return 'Invalid email format.';
+          case 'auth/user-disabled': return 'This account has been disabled.';
+          case 'auth/user-not-found': return 'No account found for this email.';
+          case 'auth/wrong-password': return 'Incorrect password.';
+          case 'auth/too-many-requests': return 'Too many attempts. Try again later.';
+          default: return 'Sign-in failed. Please try again.';
+        }
+      }
+    </script>
+  </body>
+</html>
+

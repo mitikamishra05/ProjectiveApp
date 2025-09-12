@@ -16,8 +16,16 @@
       <p class="sub">Adjust angle, speed, and gravity (try different planets) — then launch!</p>
     </header>
 
-    <main class="app">
+    <main class="app" id="appRoot">
       <section class="panel controls" aria-label="Controls">
+        <div class="control-row">
+          <label>Account</label>
+          <div class="control-input">
+            <div id="userEmail">Signed in</div>
+            <button id="signOut" class="btn" type="button">Sign out</button>
+          </div>
+        </div>
+
         <div class="control-row">
           <label for="angle">Angle (°)</label>
           <div class="control-input">
@@ -66,6 +74,14 @@
           <div><span class="label">Max height:</span> <span id="hOut">—</span> m</div>
           <div><span class="label">Range:</span> <span id="rOut">—</span> m</div>
         </div>
+
+        <div class="control-row">
+          <label for="save">Save</label>
+          <div class="control-input">
+            <button id="save" class="btn primary" type="button">Save Simulation</button>
+            <span id="saveNote"></span>
+          </div>
+        </div>
       </section>
 
       <section class="panel stage" aria-label="Simulation canvas">
@@ -78,6 +94,90 @@
     </footer>
 
     <script src="script.js"></script>
+    <script type="module">
+      // Firebase Auth gate + Firestore save (replace placeholders below)
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY',
+        authDomain: 'YOUR_AUTH_DOMAIN',
+        projectId: 'YOUR_PROJECT_ID',
+        storageBucket: 'YOUR_STORAGE_BUCKET',
+        messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+        appId: 'YOUR_APP_ID',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      const appRoot = document.getElementById('appRoot');
+      const userEmailEl = document.getElementById('userEmail');
+      const signOutBtn = document.getElementById('signOut');
+      const saveBtn = document.getElementById('save');
+      const saveNote = document.getElementById('saveNote');
+
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          window.location.replace('login.html');
+          return;
+        }
+        userEmailEl.textContent = user.email || 'Signed in';
+        // Trigger a resize to ensure canvas metrics are correct after auth gating
+        try { window.dispatchEvent(new Event('resize')); } catch {}
+      });
+
+      signOutBtn.addEventListener('click', async () => {
+        await signOut(auth);
+        window.location.replace('login.html');
+      });
+
+      // Helpers to compute analytics for saving
+      const angleEl = document.getElementById('angle');
+      const speedEl = document.getElementById('speed');
+      const planetEl = document.getElementById('planet');
+      const customGEl = document.getElementById('customG');
+
+      const planetG = { Mercury: 3.7, Venus: 8.87, Earth: 9.81, Moon: 1.62, Mars: 3.71, Jupiter: 24.79, Saturn: 10.44, Uranus: 8.69, Neptune: 11.15, Pluto: 0.62 };
+      const getG = () => planetEl.value === 'Custom' ? Math.max(0.01, parseFloat(customGEl.value) || 9.81) : (planetG[planetEl.value] ?? 9.81);
+
+      function compute(v0, theta, g) {
+        const T = (g > 0) ? (2 * v0 * Math.sin(theta)) / g : 0;
+        const H = (g > 0) ? ((v0 * Math.sin(theta)) ** 2) / (2 * g) : 0;
+        const R = (g > 0) ? ((v0 ** 2) * Math.sin(2 * theta)) / g : 0;
+        return { T, H, R };
+      }
+
+      saveBtn.addEventListener('click', async () => {
+        saveNote.textContent = '';
+        const user = auth.currentUser;
+        if (!user) { window.location.replace('login.html'); return; }
+        const angleDeg = parseFloat(angleEl.value);
+        const speed = parseFloat(speedEl.value);
+        const g = getG();
+        const { T, H, R } = compute(speed, (angleDeg * Math.PI) / 180, g);
+        try {
+          await addDoc(collection(db, 'simulations'), {
+            uid: user.uid,
+            email: user.email || null,
+            angle: angleDeg,
+            speed: speed,
+            gravity: g,
+            time: T,
+            height: H,
+            range: R,
+            createdAt: serverTimestamp(),
+          });
+          saveNote.textContent = 'Saved!';
+          saveNote.style.color = 'var(--success)';
+        } catch (e) {
+          console.error(e);
+          saveNote.textContent = 'Save failed. Check console.';
+          saveNote.style.color = 'var(--danger)';
+        }
+      });
+    </script>
   </body>
 </html>
-
