@@ -79,26 +79,32 @@
       signOutBtn.addEventListener('click', async () => { await signOut(auth); window.location.replace('login.html'); });
 
       function loadSims(uid){
-        const q = query(collection(db, 'simulations'), where('uid', '==', uid), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'users', uid, 'simulations'), orderBy('createdAt', 'desc'));
         onSnapshot(q, (snap) => {
           listEl.innerHTML = '';
           if (snap.empty) { emptyEl.hidden = false; return; }
           emptyEl.hidden = true;
-          snap.forEach((doc) => {
-            const d = doc.data();
+          snap.forEach((docSnap) => {
+            const d = docSnap.data();
             const card = document.createElement('div');
             card.className = 'card';
+            const data = d.data || {};
             card.innerHTML = `
-              <div class="row"><strong>Angle:</strong> ${fmt(d.angle)}°</div>
-              <div class="row"><strong>Speed:</strong> ${fmt(d.speed)} m/s</div>
-              <div class="row"><strong>Gravity:</strong> ${fmt(d.gravity)} m/s²</div>
-              <div class="row"><strong>Time:</strong> ${fmt(d.time)} s</div>
-              <div class="row"><strong>Height:</strong> ${fmt(d.height)} m</div>
-              <div class="row"><strong>Range:</strong> ${fmt(d.range)} m</div>
+              <div class="row"><strong>Title:</strong> ${escapeHtml(d.title || 'Untitled')}</div>
+              <div class="row"><strong>Angle:</strong> ${fmt(data.angle)}°</div>
+              <div class="row"><strong>Speed:</strong> ${fmt(data.speed)} m/s</div>
+              <div class="row"><strong>Gravity:</strong> ${fmt(data.gravity)} m/s²</div>
+              <div class="row"><strong>Time:</strong> ${fmt(data.time)} s</div>
+              <div class="row"><strong>Height:</strong> ${fmt(data.height)} m</div>
+              <div class="row"><strong>Range:</strong> ${fmt(data.range)} m</div>
             `;
             listEl.appendChild(card);
           });
         });
+      }
+
+      function escapeHtml(s){
+        return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
       }
 
       function fmt(n){ return (n===undefined||n===null) ? '—' : Number(n).toFixed(2); }

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Class 11 Topics • Projectile Motion App</title>
+    <meta name="description" content="Class 11 topics loaded dynamically from Firestore." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root { --bg:#0b1020; --panel:rgba(18,25,48,0.85); --panel-border:rgba(255,255,255,0.08); --text:#e6e9f0; --muted:#a9b1c3; --primary:#6aa6ff; --primary-700:#4a8bf3; }
+      *{box-sizing:border-box} html,body{height:100%}
+      body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);background:radial-gradient(1200px 800px at 70% 10%,#1c2448 0%,#0b1020 60%,#050814 100%)}
+      header{padding:16px;text-align:center}
+      header h1{margin:0}
+      header .sub{color:var(--muted)}
+      .wrap{max-width:900px;margin:0 auto;padding:16px}
+      .card{background:var(--panel);border:1px solid var(--panel-border);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+      .row{margin-bottom:10px}
+      ul{margin:8px 0 0 20px}
+      a{color:#9cc4ff}
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Class 11 Topics</h1>
+      <p class="sub"><a href="index.html">Back to Simulator</a></p>
+    </header>
+    <div class="wrap">
+      <div class="card">
+        <div class="row"><strong>Physics</strong>
+          <ul id="physics"></ul>
+        </div>
+        <div class="row"><strong>Chemistry</strong>
+          <ul id="chemistry"></ul>
+        </div>
+        <div class="row"><strong>Math</strong>
+          <ul id="math"></ul>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY',
+        authDomain: 'YOUR_AUTH_DOMAIN',
+        projectId: 'YOUR_PROJECT_ID',
+        storageBucket: 'YOUR_STORAGE_BUCKET',
+        messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+        appId: 'YOUR_APP_ID',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const targets = {
+        physics: document.getElementById('physics'),
+        chemistry: document.getElementById('chemistry'),
+        math: document.getElementById('math'),
+      };
+
+      async function ensureSeed(){
+        const ref = doc(db, 'topics', 'class11');
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          await setDoc(ref, {
+            physics: [ 'Laws of Motion', 'Gravitation', 'Work and Energy' ],
+            chemistry: [ 'Structure of Atom', 'Thermodynamics', 'Equilibrium' ],
+            math: [ 'Trigonometric Functions', 'Sequences and Series', 'Straight Lines' ],
+          });
+        }
+      }
+
+      function renderList(arr, ul){
+        ul.innerHTML = '';
+        (arr || []).forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          ul.appendChild(li);
+        });
+      }
+
+      async function load(){
+        await ensureSeed();
+        const ref = doc(db, 'topics', 'class11');
+        const snap = await getDoc(ref);
+        const data = snap.data() || {};
+        renderList(data.physics, targets.physics);
+        renderList(data.chemistry, targets.chemistry);
+        renderList(data.math, targets.math);
+      }
+
+      load();
+    </script>
+  </body>
+</html>
+

@@ -14,7 +14,11 @@
     <header class="app-header">
       <h1>Projectile Motion Simulator</h1>
       <p class="sub">Adjust angle, speed, and gravity (try different planets) — then launch!</p>
-      <p class="sub"><a href="mysims.html" style="color:#9cc4ff;">My Simulations</a></p>
+      <p class="sub">
+        <a href="mysims.html" style="color:#9cc4ff; margin-right: 12px;">My Simulations</a>
+        <a href="class11.html" style="color:#9cc4ff; margin-right: 12px;">Class 11 Topics</a>
+        <a href="class12.html" style="color:#9cc4ff;">Class 12 Topics</a>
+      </p>
     </header>
 
     <main class="app" id="appRoot">
@@ -77,6 +81,14 @@
         </div>
 
         <div class="control-row">
+          <label for="title">Title</label>
+          <div class="control-input">
+            <input id="title" type="text" placeholder="e.g., 45° @ 40 m/s on Earth" />
+            <output></output>
+          </div>
+        </div>
+
+        <div class="control-row">
           <label for="save">Save</label>
           <div class="control-input">
             <button id="save" class="btn primary" type="button">Save Simulation</button>
@@ -99,17 +111,17 @@
       // Firebase Auth gate + Firestore save (replace placeholders below)
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
       import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-      import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+      import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
       const firebaseConfig = {
-        apiKey: 'YOUR_API_KEY',
-        authDomain: 'YOUR_AUTH_DOMAIN',
-        projectId: 'YOUR_PROJECT_ID',
-        storageBucket: 'YOUR_STORAGE_BUCKET',
-        messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-        appId: 'YOUR_APP_ID',
-      };
-
+    apiKey: "AIzaSyCkB2pAUYowjLq9LxTy59e4NzMALQ6sLmQ",
+    authDomain: "esp32-firebase-db-89c3d.firebaseapp.com",
+    databaseURL: "https://esp32-firebase-db-89c3d-default-rtdb.firebaseio.com",
+    projectId: "esp32-firebase-db-89c3d",
+    storageBucket: "esp32-firebase-db-89c3d.firebasestorage.app",
+    messagingSenderId: "997910939684",
+    appId: "1:997910939684:web:bd0d38d039490bdcd130b1"
+    };
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
       const db = getFirestore(app);
@@ -120,12 +132,16 @@
       const saveBtn = document.getElementById('save');
       const saveNote = document.getElementById('saveNote');
 
-      onAuthStateChanged(auth, (user) => {
+      onAuthStateChanged(auth, async (user) => {
         if (!user) {
           window.location.replace('login.html');
           return;
         }
         userEmailEl.textContent = user.email || 'Signed in';
+        // Ensure profile doc exists (email preserved, class can be set via registration)
+        try {
+          await setDoc(doc(db, 'users', user.uid), { email: user.email || null }, { merge: true });
+        } catch (e) { console.warn('Profile upsert failed', e); }
         // Trigger a resize to ensure canvas metrics are correct after auth gating
         try { window.dispatchEvent(new Event('resize')); } catch {}
       });
@@ -140,6 +156,7 @@
       const speedEl = document.getElementById('speed');
       const planetEl = document.getElementById('planet');
       const customGEl = document.getElementById('customG');
+      const titleEl = document.getElementById('title');
 
       const planetG = { Mercury: 3.7, Venus: 8.87, Earth: 9.81, Moon: 1.62, Mars: 3.71, Jupiter: 24.79, Saturn: 10.44, Uranus: 8.69, Neptune: 11.15, Pluto: 0.62 };
       const getG = () => planetEl.value === 'Custom' ? Math.max(0.01, parseFloat(customGEl.value) || 9.81) : (planetG[planetEl.value] ?? 9.81);
@@ -159,20 +176,16 @@
         const speed = parseFloat(speedEl.value);
         const g = getG();
         const { T, H, R } = compute(speed, (angleDeg * Math.PI) / 180, g);
+        const title = (titleEl.value || `Sim ${angleDeg}° @ ${speed} m/s, g=${g}`).trim();
         try {
-          await addDoc(collection(db, 'simulations'), {
-            uid: user.uid,
-            email: user.email || null,
-            angle: angleDeg,
-            speed: speed,
-            gravity: g,
-            time: T,
-            height: H,
-            range: R,
+          await addDoc(collection(db, 'users', user.uid, 'simulations'), {
+            title,
+            data: { angle: angleDeg, speed, gravity: g, time: T, height: H, range: R },
             createdAt: serverTimestamp(),
           });
           saveNote.textContent = 'Saved!';
           saveNote.style.color = 'var(--success)';
+          titleEl.value = '';
         } catch (e) {
           console.error(e);
           saveNote.textContent = 'Save failed. Check console.';
