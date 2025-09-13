@@ -9,16 +9,28 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="app.css" />
+    <script src="theme.js"></script>
   </head>
   <body>
+    <nav class="topnav">
+      <div class="brand">Student Physics Lab</div>
+      <div class="links">
+        <a href="index.html">Simulator</a>
+        <a href="mysims.html">My Simulations</a>
+        <a href="class11.html">Class 11 Topics</a>
+        <a href="class12.html">Class 12 Topics</a>
+        <a href="dashboard.html">Profile</a>
+      </div>
+      <div class="right">
+        <button class="btn" id="themeToggle" type="button">Toggle Theme</button>
+        <button class="btn" id="signOut" type="button">Logout</button>
+      </div>
+    </nav>
+
     <header class="app-header">
       <h1>Projectile Motion Simulator</h1>
       <p class="sub">Adjust angle, speed, and gravity (try different planets) — then launch!</p>
-      <p class="sub">
-        <a href="mysims.html" style="color:#9cc4ff; margin-right: 12px;">My Simulations</a>
-        <a href="class11.html" style="color:#9cc4ff; margin-right: 12px;">Class 11 Topics</a>
-        <a href="class12.html" style="color:#9cc4ff;">Class 12 Topics</a>
-      </p>
     </header>
 
     <main class="app" id="appRoot">
@@ -44,6 +56,14 @@
           <div class="control-input">
             <input id="speed" type="range" min="5" max="120" step="1" value="40" />
             <output id="speedOut">40 m/s</output>
+          </div>
+        </div>
+
+        <div class="control-row">
+          <label for="mass">Mass (kg)</label>
+          <div class="control-input">
+            <input id="mass" type="range" min="0.1" max="10" step="0.1" value="1" />
+            <output id="massOut">1 kg</output>
           </div>
         </div>
 
@@ -100,6 +120,14 @@
       <section class="panel stage" aria-label="Simulation canvas">
         <canvas id="canvas" width="1200" height="700" aria-label="Projectile canvas"></canvas>
       </section>
+
+      <section class="panel chart" aria-label="Kinetic energy chart">
+        <div class="hstack" style="justify-content: space-between;">
+          <div>Realtime Kinetic Energy (J)</div>
+          <div id="keOut" class="text-muted">—</div>
+        </div>
+        <canvas id="chart" width="1200" height="160"></canvas>
+      </section>
     </main>
 
     <footer class="app-footer">
@@ -107,6 +135,13 @@
     </footer>
 
     <script src="script.js"></script>
+    <script>
+      // Theme button
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (btn && window.Theme) btn.addEventListener('click', () => Theme.toggle());
+      });
+    </script>
     <script type="module">
       // Firebase Auth gate + Firestore save (replace placeholders below)
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -178,11 +213,12 @@
         const { T, H, R } = compute(speed, (angleDeg * Math.PI) / 180, g);
         const title = (titleEl.value || `Sim ${angleDeg}° @ ${speed} m/s, g=${g}`).trim();
         try {
-          await addDoc(collection(db, 'users', user.uid, 'simulations'), {
+          const docRef = await addDoc(collection(db, 'users', user.uid, 'simulations'), {
             title,
             data: { angle: angleDeg, speed, gravity: g, time: T, height: H, range: R },
             createdAt: serverTimestamp(),
           });
+          await setDoc(doc(db, 'users', user.uid), { lastSim: { id: docRef.id, title } }, { merge: true });
           saveNote.textContent = 'Saved!';
           saveNote.style.color = 'var(--success)';
           titleEl.value = '';

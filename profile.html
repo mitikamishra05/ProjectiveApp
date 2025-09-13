@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profile • Student Physics Lab</title>
+    <meta name="description" content="Edit your profile information." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css" />
+    <script src="theme.js"></script>
+    <style>
+      .form-row { margin-bottom: 12px; }
+      label { display:block; font-weight:600; margin-bottom: 6px; }
+      input, select { width:100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-border); background: var(--surface); color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <nav class="topnav">
+      <div class="brand">Student Physics Lab</div>
+      <div class="links">
+        <a href="index.html">Simulator</a>
+        <a href="mysims.html">My Simulations</a>
+        <a href="class11.html">Class 11 Topics</a>
+        <a href="class12.html">Class 12 Topics</a>
+        <a href="dashboard.html">Profile</a>
+      </div>
+      <div class="right">
+        <button class="btn" id="themeToggle" type="button">Toggle Theme</button>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="card">
+        <h2>Edit Profile</h2>
+        <div class="form-row">
+          <label for="name">Name</label>
+          <input id="name" type="text" placeholder="Your name" />
+        </div>
+        <div class="form-row">
+          <label for="classSel">Class</label>
+          <select id="classSel">
+            <option value="">Select class</option>
+            <option value="11">Class 11</option>
+            <option value="12">Class 12</option>
+          </select>
+        </div>
+        <div class="hstack">
+          <button class="btn primary" id="saveBtn" type="button">Save</button>
+          <span id="status" class="text-muted"></span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (btn && window.Theme) btn.addEventListener('click', () => Theme.toggle());
+      });
+    </script>
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY', authDomain: 'YOUR_AUTH_DOMAIN', projectId: 'YOUR_PROJECT_ID', storageBucket: 'YOUR_STORAGE_BUCKET', messagingSenderId: 'YOUR_MESSAGING_SENDER_ID', appId: 'YOUR_APP_ID',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      const nameEl = document.getElementById('name');
+      const classSel = document.getElementById('classSel');
+      const saveBtn = document.getElementById('saveBtn');
+      const statusEl = document.getElementById('status');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      logoutBtn.addEventListener('click', async () => { await signOut(auth); window.location.replace('login.html'); });
+
+      let currentUser = null;
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.replace('login.html'); return; }
+        currentUser = user;
+        const ref = doc(db, 'users', user.uid);
+        const snap = await getDoc(ref);
+        const data = snap.exists() ? snap.data() : {};
+        nameEl.value = data.name || '';
+        classSel.value = data.class || '';
+      });
+
+      saveBtn.addEventListener('click', async () => {
+        statusEl.textContent = '';
+        if (!currentUser) return;
+        const payload = { name: nameEl.value.trim() || null, class: classSel.value || null };
+        try {
+          await setDoc(doc(db, 'users', currentUser.uid), payload, { merge: true });
+          statusEl.textContent = 'Saved';
+        } catch (e) {
+          console.error(e); statusEl.textContent = 'Save failed';
+        }
+      });
+    </script>
+  </body>
+</html>
+

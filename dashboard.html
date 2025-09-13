@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard • Student Physics Lab</title>
+    <meta name="description" content="Personalized learning dashboard with progress and recent simulations." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css" />
+    <script src="theme.js"></script>
+  </head>
+  <body>
+    <nav class="topnav">
+      <div class="brand">Student Physics Lab</div>
+      <div class="links">
+        <a href="index.html">Simulator</a>
+        <a href="mysims.html">My Simulations</a>
+        <a href="class11.html">Class 11 Topics</a>
+        <a href="class12.html">Class 12 Topics</a>
+        <a href="dashboard.html">Profile</a>
+      </div>
+      <div class="right">
+        <button class="btn" id="themeToggle" type="button">Toggle Theme</button>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="grid cols-3">
+        <div class="card vstack">
+          <h2>Welcome</h2>
+          <div id="userName" class="text-muted">—</div>
+          <div class="hstack"><strong>Class:</strong> <span id="userClass" class="text-muted">—</span></div>
+          <div class="hstack">
+            <a class="btn" href="profile.html">Edit Profile</a>
+            <a class="btn primary" href="index.html">Open Simulator</a>
+          </div>
+        </div>
+
+        <div class="card vstack">
+          <h2>Progress</h2>
+          <div>Topics completed</div>
+          <div class="progress"><span id="topicsBar" style="width:0%"></span></div>
+          <div class="text-muted" id="topicsPct">0%</div>
+          <div>Simulations completed</div>
+          <div class="progress"><span id="simsBar" style="width:0%"></span></div>
+          <div class="text-muted" id="simsPct">0%</div>
+        </div>
+
+        <div class="card vstack">
+          <h2>Achievements</h2>
+          <div class="badges" id="badges"></div>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:12px;">
+        <div class="card vstack">
+          <h3>Recent Simulations</h3>
+          <div id="recentSims" class="vstack"></div>
+          <a class="btn" href="mysims.html">View All</a>
+        </div>
+        <div class="card vstack">
+          <h3>Continue where you left off</h3>
+          <div id="resumeInfo" class="text-muted">—</div>
+          <a id="resumeBtn" class="btn primary" href="index.html">Resume</a>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (btn && window.Theme) btn.addEventListener('click', () => Theme.toggle());
+      });
+    </script>
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, getCountFromServer, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY', authDomain: 'YOUR_AUTH_DOMAIN', projectId: 'YOUR_PROJECT_ID', storageBucket: 'YOUR_STORAGE_BUCKET', messagingSenderId: 'YOUR_MESSAGING_SENDER_ID', appId: 'YOUR_APP_ID',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      const userName = document.getElementById('userName');
+      const userClass = document.getElementById('userClass');
+      const recentSims = document.getElementById('recentSims');
+      const topicsBar = document.getElementById('topicsBar');
+      const topicsPct = document.getElementById('topicsPct');
+      const simsBar = document.getElementById('simsBar');
+      const simsPct = document.getElementById('simsPct');
+      const badges = document.getElementById('badges');
+      const resumeInfo = document.getElementById('resumeInfo');
+      const resumeBtn = document.getElementById('resumeBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      logoutBtn.addEventListener('click', async () => { await signOut(auth); window.location.replace('login.html'); });
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.replace('login.html'); return; }
+        const uref = doc(db, 'users', user.uid);
+        const usnap = await getDoc(uref);
+        const udata = usnap.exists() ? usnap.data() : {};
+        userName.textContent = udata.name || user.email || 'Student';
+        userClass.textContent = udata.class || '—';
+
+        // Progress: topics (count of arrays in topics docs)
+        // Approximation: completed topics field could be stored later; for now count all topics as 0 completed
+        const topicDocs = await Promise.all([
+          getDoc(doc(db, 'topics', 'class11')),
+          getDoc(doc(db, 'topics', 'class12')),
+        ]);
+        const totalTopics = topicDocs.reduce((acc, s) => {
+          const d = s.data() || {}; return acc + ['physics','chemistry','math'].reduce((k, k2)=>k+(Array.isArray(d[k2])?d[k2].length:0),0);
+        }, 0);
+        const completedTopics = udata.completedTopicsCount || 0;
+        const tPct = totalTopics ? Math.round(100 * completedTopics / totalTopics) : 0;
+        topicsBar.style.width = tPct + '%'; topicsPct.textContent = tPct + '%';
+
+        // Progress: simulations
+        const simsCount = await getCountFromServer(collection(db, 'users', user.uid, 'simulations'));
+        const simsTotal = simsCount.data().count || 0;
+        const sPct = Math.min(100, simsTotal * 10); // simple mapping for demo
+        simsBar.style.width = sPct + '%'; simsPct.textContent = sPct + '%';
+
+        // Badges
+        badges.innerHTML = '';
+        if (simsTotal >= 5) badges.innerHTML += '<span class="badge gold">Completed 5 Simulations</span>';
+        if (simsTotal >= 1) badges.innerHTML += '<span class="badge silver">First Launch</span>';
+
+        // Recent sims
+        const qref = query(collection(db, 'users', user.uid, 'simulations'), orderBy('createdAt','desc'), limit(5));
+        const qsnap = await getDocs(qref);
+        recentSims.innerHTML = '';
+        qsnap.forEach(docSnap => {
+          const d = docSnap.data();
+          const div = document.createElement('div');
+          div.className = 'card';
+          const dt = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleString() : '';
+          div.textContent = `${d.title || 'Untitled'} — ${dt}`;
+          recentSims.appendChild(div);
+        });
+
+        // Resume
+        if (udata.lastSim) {
+          resumeInfo.textContent = `${udata.lastSim.title || 'Simulation'} (saved)`;
+        } else {
+          resumeInfo.textContent = 'No previous simulation.';
+        }
+      });
+    </script>
+  </body>
+</html>
+

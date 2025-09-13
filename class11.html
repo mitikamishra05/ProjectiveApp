@@ -8,38 +8,51 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css" />
+    <script src="theme.js"></script>
     <style>
-      :root { --bg:#0b1020; --panel:rgba(18,25,48,0.85); --panel-border:rgba(255,255,255,0.08); --text:#e6e9f0; --muted:#a9b1c3; --primary:#6aa6ff; --primary-700:#4a8bf3; }
-      *{box-sizing:border-box} html,body{height:100%}
-      body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);background:radial-gradient(1200px 800px at 70% 10%,#1c2448 0%,#0b1020 60%,#050814 100%)}
-      header{padding:16px;text-align:center}
-      header h1{margin:0}
-      header .sub{color:var(--muted)}
-      .wrap{max-width:900px;margin:0 auto;padding:16px}
-      .card{background:var(--panel);border:1px solid var(--panel-border);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
-      .row{margin-bottom:10px}
-      ul{margin:8px 0 0 20px}
-      a{color:#9cc4ff}
+      .topics { display:grid; gap: 10px; }
+      .topic-item { display:flex; align-items:center; gap: 8px; }
     </style>
   </head>
   <body>
+    <nav class="topnav">
+      <div class="brand">Student Physics Lab</div>
+      <div class="links">
+        <a href="index.html">Simulator</a>
+        <a href="mysims.html">My Simulations</a>
+        <a href="class11.html">Class 11 Topics</a>
+        <a href="class12.html">Class 12 Topics</a>
+        <a href="dashboard.html">Profile</a>
+      </div>
+      <div class="right">
+        <button class="btn" id="themeToggle" type="button">Toggle Theme</button>
+      </div>
+    </nav>
     <header>
       <h1>Class 11 Topics</h1>
-      <p class="sub"><a href="index.html">Back to Simulator</a></p>
+      <p class="sub">Fetches from Firestore</p>
     </header>
     <div class="wrap">
       <div class="card">
         <div class="row"><strong>Physics</strong>
-          <ul id="physics"></ul>
+          <ul id="physics" class="topics"></ul>
         </div>
         <div class="row"><strong>Chemistry</strong>
-          <ul id="chemistry"></ul>
+          <ul id="chemistry" class="topics"></ul>
         </div>
         <div class="row"><strong>Math</strong>
-          <ul id="math"></ul>
+          <ul id="math" class="topics"></ul>
         </div>
       </div>
     </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (btn && window.Theme) btn.addEventListener('click', () => Theme.toggle());
+      });
+    </script>
 
     <script type="module">
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -79,7 +92,14 @@
         ul.innerHTML = '';
         (arr || []).forEach(item => {
           const li = document.createElement('li');
-          li.textContent = item;
+          li.className = 'topic-item';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.disabled = true; // tracking can be toggled later
+          const span = document.createElement('span');
+          span.textContent = item;
+          li.appendChild(cb);
+          li.appendChild(span);
           ul.appendChild(li);
         });
       }

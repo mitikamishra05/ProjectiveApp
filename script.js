@@ -11,6 +11,8 @@
   const angleOut = document.getElementById('angleOut');
   const speedEl = document.getElementById('speed');
   const speedOut = document.getElementById('speedOut');
+  const massEl = document.getElementById('mass');
+  const massOut = document.getElementById('massOut');
   const planetEl = document.getElementById('planet');
   const customGEl = document.getElementById('customG');
   const gOut = document.getElementById('gOut');
@@ -20,6 +22,9 @@
   const launchBtn = document.getElementById('launch');
   const pauseBtn = document.getElementById('pause');
   const resetBtn = document.getElementById('reset');
+  const keOut = document.getElementById('keOut');
+  const chartCanvas = document.getElementById('chart');
+  const chartCtx = chartCanvas ? chartCanvas.getContext('2d') : null;
 
   const planets = {
     Mercury: 3.7,
@@ -65,12 +70,13 @@
     const angleDeg = parseFloat(angleEl.value);
     const angleRad = (angleDeg * Math.PI) / 180;
     const speed = parseFloat(speedEl.value);
+    const mass = parseFloat(massEl ? massEl.value : '1');
     const g = getG();
-    return { angleDeg, angleRad, speed, g };
+    return { angleDeg, angleRad, speed, mass, g };
   }
 
   function computeAnalytics(v0, theta, g) {
-    // For y0 = 0
+    // Ideal projectile (no air), from ground level (y0 = 0)
     const vSin = v0 * Math.sin(theta);
     const vCos = v0 * Math.cos(theta);
     const T = g > 0 ? (2 * vSin) / g : Infinity;
@@ -329,6 +335,20 @@
     requestAnimationFrame(tick);
   }
 
+  function drawKE(t, v) {
+    if (!chartCtx || !isFinite(v)) return;
+    // Scroll-like chart: shift left by 2px, draw new line point
+    const w = chartCanvas.width, h = chartCanvas.height;
+    const img = chartCtx.getImageData(2, 0, w - 2, h);
+    chartCtx.putImageData(img, 0, 0);
+    chartCtx.clearRect(w - 2, 0, 2, h);
+    // Normalize KE to chart height heuristically
+    const scale = Math.max(1, 0.5 * h / 1000); // arbitrary scale for visibility
+    const y = Math.max(0, h - Math.min(h, 0.5 * v * v * scale));
+    chartCtx.fillStyle = '#6aa6ff';
+    chartCtx.fillRect(w - 2, y, 2, 2);
+  }
+
   function tick(ts) {
     if (!state.running) {
       draw();
@@ -341,12 +361,19 @@
 
     if (!state.paused) {
       state.t += dt;
-      const { speed, angleRad, g } = getSettings();
+      const { speed, angleRad, g, mass } = getSettings();
       const x = speed * Math.cos(angleRad) * state.t;
       const y = speed * Math.sin(angleRad) * state.t - 0.5 * g * state.t * state.t;
 
       if (y >= 0) {
         state.path.push({ x, y });
+        // KE = 1/2 m v^2; here v is instantaneous speed; we use planar components
+        const vx = speed * Math.cos(angleRad);
+        const vy = speed * Math.sin(angleRad) - g * state.t;
+        const v = Math.sqrt(vx*vx + vy*vy);
+        const ke = 0.5 * mass * v * v;
+        if (keOut) keOut.textContent = formatNum(ke, 1);
+        if (chartCtx) drawKE(state.t, v);
       } else {
         // Landed
         state.running = false;
@@ -364,6 +391,11 @@
     angleOut.textContent = `${angleEl.value}°`;
     refreshPreview();
   }
+  function onMassChange() {
+    if (!massOut) return;
+    massOut.textContent = `${massEl.value} kg`;
+  }
+
   function onSpeedChange() {
     speedOut.textContent = `${speedEl.value} m/s`;
     refreshPreview();
@@ -401,6 +433,7 @@
   // Inputs
   angleEl.addEventListener('input', onAngleChange);
   speedEl.addEventListener('input', onSpeedChange);
+  if (massEl) massEl.addEventListener('input', onMassChange);
   planetEl.addEventListener('change', onPlanetChange);
   customGEl.addEventListener('input', onCustomGChange);
 
@@ -410,6 +443,7 @@
   // Initial UI sync
   angleOut.textContent = `${angleEl.value}°`;
   speedOut.textContent = `${speedEl.value} m/s`;
+  if (massOut && massEl) massOut.textContent = `${massEl.value} kg`;
   customGEl.value = planets[planetEl.value] ?? 9.81;
 
   // Initial sizing & draw

@@ -1,0 +1,72 @@
+/* Shared styles for the learning app: nav, layout, dark/light, badges, progress */
+:root {
+  --bg: #0b1020;
+  --panel: rgba(18, 25, 48, 0.8);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text: #e6e9f0;
+  --muted: #a9b1c3;
+  --primary: #6aa6ff;
+  --primary-700: #4a8bf3;
+  --success: #45d483;
+  --danger: #ff647c;
+  --surface: rgba(255,255,255,0.06);
+}
+
+/* Light theme overrides */
+html[data-theme="light"] {
+  --bg: #f6f7fb;
+  --panel: #ffffffcc;
+  --panel-border: rgba(0,0,0,0.08);
+  --text: #16181d;
+  --muted: #546170;
+  --surface: rgba(0,0,0,0.04);
+}
+
+body { background-color: var(--bg); }
+
+/* Top navigation */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; position: sticky; top: 0; z-index: 50;
+  background: var(--panel); border-bottom: 1px solid var(--panel-border);
+  backdrop-filter: blur(6px);
+}
+.topnav .brand { font-weight: 700; letter-spacing: .3px; }
+.topnav .links { display: flex; gap: 12px; flex-wrap: wrap; }
+.topnav a { color: var(--text); text-decoration: none; padding: 6px 8px; border-radius: 8px; }
+.topnav a:hover { background: var(--surface); }
+.topnav .right { display: flex; gap: 8px; align-items: center; }
+.topnav .btn { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--panel-border); background: var(--surface); color: var(--text); cursor: pointer; }
+.topnav .btn.primary { background: linear-gradient(180deg, var(--primary), var(--primary-700)); border-color: transparent; color: #fff; }
+
+/* Cards, containers */
+.container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
+.grid { display: grid; gap: 12px; }
+.grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 900px) { .grid.cols-2, .grid.cols-3 { grid-template-columns: 1fr; } }
+
+/* Progress bar */
+.progress { width: 100%; height: 10px; background: var(--surface); border-radius: 999px; overflow: hidden; border: 1px solid var(--panel-border); }
+.progress > span { display: block; height: 100%; background: linear-gradient(180deg, var(--success), #2dbd6f); }
+
+/* Badges */
+.badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge { padding: 6px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--panel-border); font-size: 13px; }
+.badge.gold { background: linear-gradient(180deg, #ffe08a, #ffc857); color: #1f1302; border-color: #f6b93b; }
+.badge.silver { background: linear-gradient(180deg, #e2e8f0, #cbd5e1); color: #111827; border-color: #cbd5e1; }
+
+/* Expandable lists */
+details { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px 12px; }
+details + details { margin-top: 10px; }
+details summary { cursor: pointer; outline: none; }
+
+/* Small helpers */
+.text-muted { color: var(--muted); }
+.hstack { display: flex; gap: 8px; align-items: center; }
+.vstack { display: grid; gap: 10px; }
+
+/* Chart area */
+.chart { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 8px; }
+
