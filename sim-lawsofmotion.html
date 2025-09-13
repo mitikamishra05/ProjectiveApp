@@ -69,6 +69,13 @@
           <div class="vstack">
             <div class="card">
               <div class="hstack" style="justify-content: space-between;">
+                <div>Real-time Motion (Distance in meters)</div>
+                <div id="simNow" class="text-muted">—</div>
+              </div>
+              <canvas id="simCanvas" style="width:100%;height:220px"></canvas>
+            </div>
+            <div class="card">
+              <div class="hstack" style="justify-content: space-between;">
                 <div>Velocity v(t)</div>
                 <div id="vNow" class="text-muted">—</div>
               </div>
@@ -111,6 +118,8 @@
       const runBtn = document.getElementById('run');
       const resetBtn = document.getElementById('reset');
       const saveBtn = document.getElementById('save');
+      const simCanvas = document.getElementById('simCanvas');
+      const simNow = document.getElementById('simNow');
 
       function updateLabels(){
         FOut.textContent = `F = ${fmt(FEl.value,1)} N`;
@@ -122,28 +131,32 @@
 
       function computeSeries(){
         const F = Number(FEl.value), m = Number(mEl.value), v0 = Number(v0El.value), tMax = Number(tMaxEl.value);
-        const a = F/m; const steps = 100; const dv = [], ds = [];
-        let vmax=0, smax=0;
+        const a = F/m; const steps = 150; const dv = [], ds = [];
+        let vmax=0, smax=0, smin=0;
         for (let i=0;i<=steps;i++){
           const t = (i/steps)*tMax;
           const v = v0 + a*t;
           const s = v0*t + 0.5*a*t*t;
-          if (v>vmax) vmax=v; if (s>smax) smax=s;
+          if (v>vmax) vmax=v; if (s>smax) smax=s; if (s<smin) smin=s;
           dv.push({x:t, y:v}); ds.push({x:t, y:s});
         }
-        return { dv, ds, tMax, vmax, smax, a };
+        return { dv, ds, tMax, vmax, smax, smin, a, v0 };
       }
 
       function render(){
-        const { dv, ds, tMax, vmax, smax } = computeSeries();
+        const { dv, ds, tMax, vmax, smax, smin } = computeSeries();
+        // Charts
         const cv = document.getElementById('chartV');
         const cs = document.getElementById('chartS');
         const chV = makeChart(cv, { xLabel:'Time', yLabel:'Velocity', xUnit:'s', yUnit:'m/s', xMax: Math.max(1,tMax), yMax: Math.max(1, Math.abs(vmax)*1.1) });
-        const chS = makeChart(cs, { xLabel:'Time', yLabel:'Displacement', xUnit:'s', yUnit:'m', xMax: Math.max(1,tMax), yMax: Math.max(1, Math.abs(smax)*1.1) });
+        const chS = makeChart(cs, { xLabel:'Time', yLabel:'Displacement', xUnit:'s', yUnit:'m', xMax: Math.max(1,tMax), yMax: Math.max(1, Math.max(Math.abs(smax), Math.abs(smin))*1.1) });
         chV.plotSeries([{ points: dv, color:'#6aa6ff', markers:true, annotate:(pt,i,p,ctx)=>{ if(i%20===0){ ctx.fillStyle='white'; ctx.fillText(`${fmt(pt.x)} s, ${fmt(pt.y)} m/s`, p.x+4, p.y-6);} } }]);
         chS.plotSeries([{ points: ds, color:'#e9a23b', markers:true, annotate:(pt,i,p,ctx)=>{ if(i%20===0){ ctx.fillStyle='white'; ctx.fillText(`${fmt(pt.x)} s, ${fmt(pt.y)} m`, p.x+4, p.y-6);} } }]);
         vNow.textContent = `${fmt(dv[dv.length-1].y)} m/s @ t=${fmt(dv[dv.length-1].x)} s`;
         sNow.textContent = `${fmt(ds[ds.length-1].y)} m @ t=${fmt(ds[ds.length-1].x)} s`;
+        // Static axis draw for sim canvas
+        drawSimAxis();
+        drawSimAtTime(0);
       }
 
       FEl.addEventListener('input', ()=>{ updateLabels(); render(); });
@@ -151,21 +164,30 @@
       v0El.addEventListener('input', ()=>{ updateLabels(); render(); });
       tMaxEl.addEventListener('input', ()=>{ updateLabels(); render(); });
 
+      let animId = null;
       runBtn.addEventListener('click', ()=>{
+        cancelAnimationFrame(animId);
         const { dv, ds, tMax } = computeSeries();
         const cv = document.getElementById('chartV');
         const cs = document.getElementById('chartS');
-        const vmax = Math.max(...dv.map(p=>Math.abs(p.y))); const smax = Math.max(...ds.map(p=>Math.abs(p.y)));
+        const vmax = Math.max(...dv.map(p=>Math.abs(p.y))); const sAbsMax = Math.max(...ds.map(p=>Math.abs(p.y)));
         const chV = makeChart(cv, { xLabel:'Time', yLabel:'Velocity', xUnit:'s', yUnit:'m/s', xMax: Math.max(1,tMax), yMax: Math.max(1, vmax*1.1) });
-        const chS = makeChart(cs, { xLabel:'Time', yLabel:'Displacement', xUnit:'s', yUnit:'m', xMax: Math.max(1,tMax), yMax: Math.max(1, smax*1.1) });
-        let i=0; function step(){
-          chV.plotSeries([{ points: dv.slice(0,i+1), color:'#6aa6ff' }]);
-          chS.plotSeries([{ points: ds.slice(0,i+1), color:'#e9a23b' }]);
-          if (i<dv.length-1){ i++; requestAnimationFrame(step);} }
-        step();
+        const chS = makeChart(cs, { xLabel:'Time', yLabel:'Displacement', xUnit:'s', yUnit:'m', xMax: Math.max(1,tMax), yMax: Math.max(1, sAbsMax*1.1) });
+        const start = performance.now();
+        function frame(now){
+          const elapsed = (now - start)/1000; // seconds real-time
+          const t = Math.min(tMax, elapsed); // sync sim time to real seconds; t_max seconds total
+          const idx = Math.floor((t/tMax) * (dv.length-1));
+          chV.plotSeries([{ points: dv.slice(0, idx+1), color:'#6aa6ff' }]);
+          chS.plotSeries([{ points: ds.slice(0, idx+1), color:'#e9a23b' }]);
+          drawSimAxis();
+          drawSimAtTime(t);
+          if (t < tMax) { animId = requestAnimationFrame(frame); }
+        }
+        animId = requestAnimationFrame(frame);
       });
 
-      resetBtn.addEventListener('click', ()=>{ note.textContent=''; updateLabels(); render(); });
+      resetBtn.addEventListener('click', ()=>{ note.textContent=''; cancelAnimationFrame(animId); updateLabels(); render(); });
 
       saveBtn.addEventListener('click', async ()=>{
         note.textContent = 'Saving...';
@@ -182,6 +204,86 @@
           note.textContent = 'Saved!';
         } catch (e) { console.error(e); note.textContent = 'Save failed.'; }
       });
+
+      // --- Real-time animation helpers ---
+      function getSimScale(){
+        const { ds } = computeSeries();
+        const sVals = ds.map(p=>p.y);
+        const sMin = Math.min(0, ...sVals);
+        const sMax = Math.max(0, ...sVals);
+        return { sMin, sMax };
+      }
+
+      function drawSimAxis(){
+        if (!simCanvas) return;
+        const ctx = simCanvas.getContext('2d');
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const rect = simCanvas.getBoundingClientRect();
+        const cw = Math.max(320, Math.floor(rect.width));
+        const ch = Math.max(160, Math.floor(rect.height));
+        simCanvas.width = Math.floor(cw * dpr);
+        simCanvas.height = Math.floor(ch * dpr);
+        ctx.clearRect(0,0,simCanvas.width, simCanvas.height);
+        ctx.fillStyle = '#0b1020'; ctx.fillRect(0,0,simCanvas.width, simCanvas.height);
+        const margins = { left: 50*dpr, right: 20*dpr, top: 20*dpr, bottom: 40*dpr };
+        const w = simCanvas.width - margins.left - margins.right;
+        const y = simCanvas.height - margins.bottom;
+        // Axis line
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2*dpr;
+        ctx.beginPath(); ctx.moveTo(margins.left, y); ctx.lineTo(margins.left + w, y); ctx.stroke();
+        // Ticks in meters
+        const { sMin, sMax } = getSimScale();
+        const range = Math.max(1e-3, sMax - sMin);
+        const meters = chooseTick(range);
+        ctx.fillStyle = 'rgba(230,233,240,0.9)'; ctx.font = `${12*dpr}px Inter, sans-serif`;
+        for (let m = Math.ceil(sMin/meters)*meters; m<=sMax; m+=meters){
+          const tx = margins.left + ((m - sMin)/range)*w;
+          ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+          ctx.beginPath(); ctx.moveTo(tx, y-6*dpr); ctx.lineTo(tx, y+6*dpr); ctx.stroke();
+          ctx.fillText(`${m.toFixed(0)} m`, tx-12*dpr, y+20*dpr);
+        }
+        // Axis label
+        ctx.fillText('Distance (m)', margins.left, y+34*dpr);
+      }
+
+      function chooseTick(range){
+        // nice tick step for meters
+        const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
+        for (const s of steps){ if (range/ s <= 10) return s; }
+        return 100;
+      }
+
+      function drawSimAtTime(t){
+        if (!simCanvas) return;
+        const ctx = simCanvas.getContext('2d');
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const margins = { left: 50*dpr, right: 20*dpr, top: 20*dpr, bottom: 40*dpr };
+        const w = simCanvas.width - margins.left - margins.right;
+        const baseY = simCanvas.height - margins.bottom;
+        const { dv, ds, tMax, a, v0 } = computeSeries();
+        const { sMin, sMax } = getSimScale();
+        const range = Math.max(1e-3, sMax - sMin);
+        // compute kinematics at time t
+        const v = v0 + a*t;
+        const s = v0*t + 0.5*a*t*t;
+        const x = margins.left + ((s - sMin)/range) * w;
+        const r = 8*dpr;
+        // Ball glow
+        const g = ctx.createRadialGradient(x-r/2, baseY-r/2, r/4, x, baseY, r*2);
+        g.addColorStop(0, 'rgba(106,166,255,0.5)'); g.addColorStop(1, 'rgba(106,166,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, baseY, r*1.8, 0, Math.PI*2); ctx.fill();
+        // Ball
+        const ballGrad = ctx.createLinearGradient(x, baseY-r, x, baseY+r);
+        ballGrad.addColorStop(0, '#d1e2ff'); ballGrad.addColorStop(1, '#89b5ff');
+        ctx.fillStyle = ballGrad; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1*dpr;
+        ctx.beginPath(); ctx.arc(x, baseY, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        // Labels near object
+        ctx.fillStyle = 'rgba(230,233,240,0.95)'; ctx.font = `${13*dpr}px Inter, sans-serif`;
+        ctx.fillText(`s=${fmt(s)} m`, x+12*dpr, baseY-22*dpr);
+        ctx.fillText(`v=${fmt(v)} m/s`, x+12*dpr, baseY-8*dpr);
+        ctx.fillText(`a=${fmt(a)} m/s²`, x+12*dpr, baseY+6*dpr);
+        if (simNow) simNow.textContent = `t=${fmt(t)} s`;
+      }
 
       updateLabels(); render();
     </script>
