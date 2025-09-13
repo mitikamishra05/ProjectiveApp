@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Projectile Motion 3D Lab (Class 11)</title>
+    <meta name="description" content="3D projectile motion simulation with real-time animation and charts." />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css" />
+    <script src="theme.js"></script>
+    <style>
+      .two { display:grid; grid-template-columns: 360px 1fr; gap: 12px; }
+      @media (max-width: 980px){ .two { grid-template-columns: 1fr; } }
+      .control { margin: 10px 0; }
+      label { display:block; font-weight:600; margin-bottom:6px; }
+      input[type=range], input[type=number], select { width: 100%; }
+      #threeWrap { position: relative; height: 420px; }
+      .label3d { background: rgba(0,0,0,0.6); color: #fff; padding: 4px 6px; border-radius: 8px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <nav class="topnav">
+      <div class="brand">Student Physics Lab</div>
+      <div class="links">
+        <a href="index.html">Simulator</a>
+        <a href="mysims.html">My Simulations</a>
+        <a href="class11.html">Class 11 Topics</a>
+        <a href="class12.html">Class 12 Topics</a>
+        <a href="dashboard.html">Profile</a>
+      </div>
+      <div class="right">
+        <button class="btn" id="themeToggle" type="button">Toggle Theme</button>
+        <a class="btn" href="class11.html">Back</a>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="two">
+        <div class="card">
+          <h2>Projectile Motion (3D)</h2>
+          <div class="control">
+            <label for="angle">Angle (°)</label>
+            <input id="angle" type="range" min="0" max="90" step="1" value="45" />
+            <div class="text-muted" id="angleOut"></div>
+          </div>
+          <div class="control">
+            <label for="speed">Speed (m/s)</label>
+            <input id="speed" type="range" min="5" max="120" step="1" value="40" />
+            <div class="text-muted" id="speedOut"></div>
+          </div>
+          <div class="control">
+            <label for="g">Gravity g (m/s²)</label>
+            <input id="g" type="range" min="0.1" max="30" step="0.1" value="9.8" />
+            <div class="text-muted" id="gOut"></div>
+          </div>
+          <div class="control">
+            <label for="tmax">Duration t_max (s)</label>
+            <input id="tmax" type="range" min="2" max="20" step="1" value="8" />
+            <div class="text-muted" id="tmaxOut"></div>
+          </div>
+          <div class="hstack">
+            <button class="btn primary" id="run">Run</button>
+            <button class="btn" id="pause">Pause</button>
+            <button class="btn" id="reset">Reset</button>
+            <button class="btn" id="save">Save</button>
+          </div>
+          <div class="vstack" style="margin-top:8px;">
+            <div>Time T: <span id="TOut">—</span> s</div>
+            <div>Max height H: <span id="HOut">—</span> m</div>
+            <div>Range R: <span id="ROut">—</span> m</div>
+          </div>
+          <div class="text-muted" id="note"></div>
+        </div>
+        <div class="vstack">
+          <div class="card">
+            <div class="hstack" style="justify-content: space-between;">
+              <div>3D Scene (Distance in meters)</div>
+              <div id="nowOut" class="text-muted">—</div>
+            </div>
+            <div id="threeWrap"></div>
+          </div>
+          <div class="card">
+            <div class="hstack" style="justify-content: space-between;">
+              <div>Heights y(t)</div>
+            </div>
+            <canvas id="chartY" style="width:100%;height:200px"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (btn && window.Theme) btn.addEventListener('click', () => Theme.toggle());
+      });
+    </script>
+    <script type="module">
+      import { ensureAuthAndDb, saveSimulation, makeChart, snapshotCanvas } from './sim-lib.js';
+      import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+      import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
+      import { CSS2DRenderer, CSS2DObject } from 'https://unpkg.com/three@0.157.0/examples/jsm/renderers/CSS2DRenderer.js';
+
+      const angleEl = document.getElementById('angle');
+      const speedEl = document.getElementById('speed');
+      const gEl = document.getElementById('g');
+      const tmaxEl = document.getElementById('tmax');
+      const angleOut = document.getElementById('angleOut');
+      const speedOut = document.getElementById('speedOut');
+      const gOut = document.getElementById('gOut');
+      const tmaxOut = document.getElementById('tmaxOut');
+      const TOut = document.getElementById('TOut');
+      const HOut = document.getElementById('HOut');
+      const ROut = document.getElementById('ROut');
+      const nowOut = document.getElementById('nowOut');
+      const runBtn = document.getElementById('run');
+      const pauseBtn = document.getElementById('pause');
+      const resetBtn = document.getElementById('reset');
+      const saveBtn = document.getElementById('save');
+      const note = document.getElementById('note');
+
+      const wrap = document.getElementById('threeWrap');
+      const scene = new THREE.Scene();
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      const labelRenderer = new CSS2DRenderer();
+      wrap.appendChild(renderer.domElement);
+      wrap.appendChild(labelRenderer.domElement);
+      labelRenderer.domElement.style.position = 'absolute';
+      labelRenderer.domElement.style.top = '0';
+      labelRenderer.domElement.style.pointerEvents = 'none';
+
+      const camera = new THREE.PerspectiveCamera(50, 16/9, 0.1, 5000);
+      camera.position.set(80, 40, 100);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x333355, 1.2);
+      scene.add(hemi);
+      const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(50, 80, 40); scene.add(dir);
+
+      // Ground grid (meters)
+      const grid = new THREE.GridHelper(1000, 100, 0x4a8bf3, 0x2e3656);
+      scene.add(grid);
+
+      // Axes helper
+      const axes = new THREE.AxesHelper(20);
+      scene.add(axes);
+
+      // Ball
+      const ballGeom = new THREE.SphereGeometry(1.2, 32, 16);
+      const ballMat = new THREE.MeshStandardMaterial({ color: 0x89b5ff, roughness: 0.35, metalness: 0.1 });
+      const ball = new THREE.Mesh(ballGeom, ballMat);
+      ball.position.set(0, 0, 0);
+      scene.add(ball);
+
+      // Label that follows the ball
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'label3d';
+      labelDiv.textContent = '';
+      const labelObj = new CSS2DObject(labelDiv);
+      labelObj.position.set(0, 3, 0);
+      ball.add(labelObj);
+
+      function resize(){
+        const rect = wrap.getBoundingClientRect();
+        const w = Math.max(480, Math.floor(rect.width));
+        const h = Math.max(260, Math.floor(rect.height));
+        renderer.setSize(w, h, false);
+        labelRenderer.setSize(w, h);
+        camera.aspect = w / h; camera.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // UI sync
+      function syncUI(){
+        angleOut.textContent = `θ = ${angleEl.value}°`;
+        speedOut.textContent = `v₀ = ${speedEl.value} m/s`;
+        gOut.textContent = `g = ${gEl.value} m/s²`;
+        tmaxOut.textContent = `t_max = ${tmaxEl.value} s`;
+      }
+      angleEl.addEventListener('input', syncUI);
+      speedEl.addEventListener('input', syncUI);
+      gEl.addEventListener('input', syncUI);
+      tmaxEl.addEventListener('input', syncUI);
+      syncUI();
+
+      function analytics(v0, thetaRad, g){
+        const vSin = v0*Math.sin(thetaRad), vCos = v0*Math.cos(thetaRad);
+        const T = g>0 ? (2*vSin)/g : 0;
+        const H = g>0 ? (vSin*vSin)/(2*g) : 0;
+        const R = g>0 ? (v0*v0*Math.sin(2*thetaRad))/g : 0;
+        return { T, H, R, vSin, vCos };
+      }
+
+      function predict(v0, theta, g, steps=120){
+        const pts = []; const { T } = analytics(v0, theta, g);
+        for (let i=0;i<=steps;i++){
+          const t = (i/steps) * T;
+          const x = v0*Math.cos(theta)*t;
+          const y = v0*Math.sin(theta)*t - 0.5*g*t*t;
+          if (y<0 && i>0) break; pts.push(new THREE.Vector3(x, Math.max(0,y), 0));
+        }
+        return pts;
+      }
+
+      let running = false, paused = false;
+      let startTime = 0; // ms
+      let elapsedOffset = 0; // ms accumulated before pause
+      let simDurMs = 0; // total animation duration in ms (t_max * 1000)
+      let physT = 0; // current physics time (s)
+      let Tflight = 0; // flight time (s)
+      let theta = 0; let v0 = 0; let g = 9.8;
+
+      const yChart = makeChart(document.getElementById('chartY'), { xLabel:'Time', yLabel:'Height', xUnit:'s', yUnit:'m', xMax: 10, yMax: 50 });
+
+      function prepare(){
+        v0 = Number(speedEl.value);
+        theta = Number(angleEl.value)*Math.PI/180;
+        g = Number(gEl.value);
+        const { T, H, R } = analytics(v0, theta, g);
+        TOut.textContent = T.toFixed(2);
+        HOut.textContent = H.toFixed(2);
+        ROut.textContent = R.toFixed(2);
+        // update y(t) curve
+        const steps = 120; const ypts = [];
+        for (let i=0;i<=steps;i++){
+          const t = (i/steps) * T;
+          const y = v0*Math.sin(theta)*t - 0.5*g*t*t; ypts.push({x:t, y:Math.max(0,y)});
+        }
+        yChart.plotSeries([{ points: ypts, color:'#6aa6ff', markers:true, annotate:(p,i,pt,ctx)=>{ if(i%20===0){ ctx.fillStyle='white'; ctx.fillText(`${p.x.toFixed(1)}s, ${p.y.toFixed(1)}m`, pt.x+4, pt.y-6);} } }]);
+        Tflight = T;
+      }
+      prepare();
+
+      function setBallAt(t){
+        const x = v0*Math.cos(theta)*t;
+        const y = Math.max(0, v0*Math.sin(theta)*t - 0.5*g*t*t);
+        ball.position.set(x, y, 0);
+        const vx = v0*Math.cos(theta);
+        const vy = v0*Math.sin(theta) - g*t;
+        const v = Math.sqrt(vx*vx + vy*vy);
+        const a = g;
+        labelDiv.textContent = `s=(${x.toFixed(1)}, ${y.toFixed(1)}) m\n|v|=${v.toFixed(1)} m/s\n|a|=${a.toFixed(1)} m/s²`;
+        nowOut.textContent = `t=${t.toFixed(2)} s`;
+      }
+
+      function renderLoop(now){
+        if (!running) return;
+        if (!paused){
+          const tmax = Number(tmaxEl.value);
+          const elapsed = (now - startTime) + elapsedOffset; // ms
+          const progress = Math.min(1, elapsed / (tmax*1000));
+          physT = progress * Tflight;
+          setBallAt(physT);
+          controls.update();
+          renderer.render(scene, camera);
+          labelRenderer.render(scene, camera);
+          if (progress < 1) {
+            requestAnimationFrame(renderLoop);
+          } else {
+            running = false; paused = false;
+          }
+        } else {
+          // paused: still render
+          controls.update();
+          renderer.render(scene, camera);
+          labelRenderer.render(scene, camera);
+          requestAnimationFrame(renderLoop);
+        }
+      }
+
+      runBtn.addEventListener('click', () => {
+        prepare();
+        running = true; paused = false; elapsedOffset = 0; startTime = performance.now();
+        // reset position
+        setBallAt(0);
+        requestAnimationFrame(renderLoop);
+      });
+      pauseBtn.addEventListener('click', () => {
+        if (!running) return;
+        paused = !paused;
+        if (!paused) { startTime = performance.now(); }
+        else { elapsedOffset += performance.now() - startTime; }
+      });
+      resetBtn.addEventListener('click', () => {
+        running = false; paused = false; elapsedOffset = 0; startTime = 0; physT = 0;
+        setBallAt(0);
+        renderer.render(scene, camera); labelRenderer.render(scene, camera);
+      });
+
+      saveBtn.addEventListener('click', async () => {
+        note.textContent = 'Saving...';
+        const { auth, db, user } = await ensureAuthAndDb();
+        const params = { angle: Number(angleEl.value), speed: Number(speedEl.value), g: Number(gEl.value), tmax: Number(tmaxEl.value) };
+        const { T, H, R } = analytics(Number(speedEl.value), Number(angleEl.value)*Math.PI/180, Number(gEl.value));
+        const snapshot = renderer.domElement.toDataURL('image/png');
+        try {
+          await saveSimulation(db, user, { title: 'Projectile 3D', topic: 'Projectile Motion', params, results: { T, H, R }, snapshot, resumeUrl: window.location.pathname });
+          note.textContent = 'Saved!';
+        } catch (e) { console.error(e); note.textContent = 'Save failed.'; }
+      });
+
+      // initial render
+      setBallAt(0);
+      renderer.render(scene, camera); labelRenderer.render(scene, camera);
+    </script>
+  </body>
+</html>
+
