@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Laws of Motion Lab (Class 11)</title>
+    <meta name="description" content="Interactive F=ma simulation with velocity and displacement graphs." />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css" />
+    <script src="theme.js"></script>
+    <style>
+      .two { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      @media (max-width: 900px){ .two { grid-template-columns: 1fr; } }
+      .control { margin: 8px 0; }
+      label { display:block; font-weight:600; margin-bottom:6px; }
+      input[type=range], input[type=number]{ width: 100%; }
+    </style>
+  </head>
+  <body>
+    <nav class="topnav">
+      <div class="brand">Student Physics Lab</div>
+      <div class="links">
+        <a href="index.html">Simulator</a>
+        <a href="mysims.html">My Simulations</a>
+        <a href="class11.html">Class 11 Topics</a>
+        <a href="class12.html">Class 12 Topics</a>
+        <a href="dashboard.html">Profile</a>
+      </div>
+      <div class="right">
+        <button class="btn" id="themeToggle" type="button">Toggle Theme</button>
+        <a class="btn" href="class11.html">Back</a>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="card">
+        <h2>Laws of Motion: F = m·a</h2>
+        <p class="text-muted">Adjust force F and mass m. See acceleration, velocity and displacement over time. Assumes constant F, no friction, v(0)=v₀, s(0)=s₀.</p>
+        <div class="two">
+          <div>
+            <div class="control">
+              <label for="F">Force F (N)</label>
+              <input id="F" type="range" min="0" max="100" step="1" value="20" />
+              <div class="text-muted" id="FOut"></div>
+            </div>
+            <div class="control">
+              <label for="m">Mass m (kg)</label>
+              <input id="m" type="range" min="0.5" max="20" step="0.5" value="5" />
+              <div class="text-muted" id="mOut"></div>
+            </div>
+            <div class="control">
+              <label for="v0">Initial velocity v₀ (m/s)</label>
+              <input id="v0" type="range" min="0" max="20" step="0.5" value="0" />
+              <div class="text-muted" id="v0Out"></div>
+            </div>
+            <div class="control">
+              <label for="tMax">Duration t_max (s)</label>
+              <input id="tMax" type="range" min="1" max="20" step="1" value="10" />
+              <div class="text-muted" id="tOut"></div>
+            </div>
+            <div class="hstack">
+              <button class="btn primary" id="run">Run Simulation</button>
+              <button class="btn" id="reset">Reset</button>
+              <button class="btn" id="save">Save</button>
+              <span id="note" class="text-muted"></span>
+            </div>
+            <div class="hstack"><strong>a =</strong> <span id="aOut" class="text-muted">—</span> m/s²</div>
+          </div>
+          <div class="vstack">
+            <div class="card">
+              <div class="hstack" style="justify-content: space-between;">
+                <div>Velocity v(t)</div>
+                <div id="vNow" class="text-muted">—</div>
+              </div>
+              <canvas id="chartV" style="width:100%;height:200px"></canvas>
+            </div>
+            <div class="card">
+              <div class="hstack" style="justify-content: space-between;">
+                <div>Displacement s(t)</div>
+                <div id="sNow" class="text-muted">—</div>
+              </div>
+              <canvas id="chartS" style="width:100%;height:200px"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (btn && window.Theme) btn.addEventListener('click', () => Theme.toggle());
+      });
+    </script>
+    <script type="module">
+      import { ensureAuthAndDb, saveSimulation, makeChart, snapshotCanvas } from './sim-lib.js';
+      const fmt = (n, d=2) => Number(n).toFixed(d);
+
+      const FEl = document.getElementById('F');
+      const mEl = document.getElementById('m');
+      const v0El = document.getElementById('v0');
+      const tMaxEl = document.getElementById('tMax');
+      const FOut = document.getElementById('FOut');
+      const mOut = document.getElementById('mOut');
+      const v0Out = document.getElementById('v0Out');
+      const tOut = document.getElementById('tOut');
+      const aOut = document.getElementById('aOut');
+      const vNow = document.getElementById('vNow');
+      const sNow = document.getElementById('sNow');
+      const note = document.getElementById('note');
+      const runBtn = document.getElementById('run');
+      const resetBtn = document.getElementById('reset');
+      const saveBtn = document.getElementById('save');
+
+      function updateLabels(){
+        FOut.textContent = `F = ${fmt(FEl.value,1)} N`;
+        mOut.textContent = `m = ${fmt(mEl.value,1)} kg`;
+        v0Out.textContent = `v₀ = ${fmt(v0El.value,1)} m/s`;
+        tOut.textContent = `t_max = ${fmt(tMaxEl.value,0)} s`;
+        aOut.textContent = `${fmt(Number(FEl.value)/Number(mEl.value),2)}`;
+      }
+
+      function computeSeries(){
+        const F = Number(FEl.value), m = Number(mEl.value), v0 = Number(v0El.value), tMax = Number(tMaxEl.value);
+        const a = F/m; const steps = 100; const dv = [], ds = [];
+        let vmax=0, smax=0;
+        for (let i=0;i<=steps;i++){
+          const t = (i/steps)*tMax;
+          const v = v0 + a*t;
+          const s = v0*t + 0.5*a*t*t;
+          if (v>vmax) vmax=v; if (s>smax) smax=s;
+          dv.push({x:t, y:v}); ds.push({x:t, y:s});
+        }
+        return { dv, ds, tMax, vmax, smax, a };
+      }
+
+      function render(){
+        const { dv, ds, tMax, vmax, smax } = computeSeries();
+        const cv = document.getElementById('chartV');
+        const cs = document.getElementById('chartS');
+        const chV = makeChart(cv, { xLabel:'Time', yLabel:'Velocity', xUnit:'s', yUnit:'m/s', xMax: Math.max(1,tMax), yMax: Math.max(1, Math.abs(vmax)*1.1) });
+        const chS = makeChart(cs, { xLabel:'Time', yLabel:'Displacement', xUnit:'s', yUnit:'m', xMax: Math.max(1,tMax), yMax: Math.max(1, Math.abs(smax)*1.1) });
+        chV.plotSeries([{ points: dv, color:'#6aa6ff', markers:true, annotate:(pt,i,p,ctx)=>{ if(i%20===0){ ctx.fillStyle='white'; ctx.fillText(`${fmt(pt.x)} s, ${fmt(pt.y)} m/s`, p.x+4, p.y-6);} } }]);
+        chS.plotSeries([{ points: ds, color:'#e9a23b', markers:true, annotate:(pt,i,p,ctx)=>{ if(i%20===0){ ctx.fillStyle='white'; ctx.fillText(`${fmt(pt.x)} s, ${fmt(pt.y)} m`, p.x+4, p.y-6);} } }]);
+        vNow.textContent = `${fmt(dv[dv.length-1].y)} m/s @ t=${fmt(dv[dv.length-1].x)} s`;
+        sNow.textContent = `${fmt(ds[ds.length-1].y)} m @ t=${fmt(ds[ds.length-1].x)} s`;
+      }
+
+      FEl.addEventListener('input', ()=>{ updateLabels(); render(); });
+      mEl.addEventListener('input', ()=>{ updateLabels(); render(); });
+      v0El.addEventListener('input', ()=>{ updateLabels(); render(); });
+      tMaxEl.addEventListener('input', ()=>{ updateLabels(); render(); });
+
+      runBtn.addEventListener('click', ()=>{
+        const { dv, ds, tMax } = computeSeries();
+        const cv = document.getElementById('chartV');
+        const cs = document.getElementById('chartS');
+        const vmax = Math.max(...dv.map(p=>Math.abs(p.y))); const smax = Math.max(...ds.map(p=>Math.abs(p.y)));
+        const chV = makeChart(cv, { xLabel:'Time', yLabel:'Velocity', xUnit:'s', yUnit:'m/s', xMax: Math.max(1,tMax), yMax: Math.max(1, vmax*1.1) });
+        const chS = makeChart(cs, { xLabel:'Time', yLabel:'Displacement', xUnit:'s', yUnit:'m', xMax: Math.max(1,tMax), yMax: Math.max(1, smax*1.1) });
+        let i=0; function step(){
+          chV.plotSeries([{ points: dv.slice(0,i+1), color:'#6aa6ff' }]);
+          chS.plotSeries([{ points: ds.slice(0,i+1), color:'#e9a23b' }]);
+          if (i<dv.length-1){ i++; requestAnimationFrame(step);} }
+        step();
+      });
+
+      resetBtn.addEventListener('click', ()=>{ note.textContent=''; updateLabels(); render(); });
+
+      saveBtn.addEventListener('click', async ()=>{
+        note.textContent = 'Saving...';
+        const { auth, db, user } = await ensureAuthAndDb();
+        const params = { F: Number(FEl.value), m: Number(mEl.value), v0: Number(v0El.value), tMax: Number(tMaxEl.value) };
+        const snapshot = snapshotCanvas(document.getElementById('chartV'));
+        const { dv, ds } = computeSeries();
+        try {
+          await saveSimulation(db, user, {
+            title: 'Laws of Motion: F=ma', topic: 'Laws of Motion', params,
+            results: { vEnd: dv[dv.length-1], sEnd: ds[ds.length-1] }, snapshot,
+            resumeUrl: window.location.pathname + window.location.search
+          });
+          note.textContent = 'Saved!';
+        } catch (e) { console.error(e); note.textContent = 'Save failed.'; }
+      });
+
+      updateLabels(); render();
+    </script>
+  </body>
+</html>
+

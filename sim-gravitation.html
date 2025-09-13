@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gravitation Lab (Class 11)</title>
+    <meta name="description" content="Interactive gravitation simulation with sliders and graph." />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css" />
+    <script src="theme.js"></script>
+    <style>
+      .panel { margin-top: 12px; }
+      .control { margin: 8px 0; }
+      label { display:block; font-weight:600; margin-bottom:6px; }
+      input[type=range], input[type=number] { width: 100%; }
+      .two { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <nav class="topnav">
+      <div class="brand">Student Physics Lab</div>
+      <div class="links">
+        <a href="index.html">Simulator</a>
+        <a href="mysims.html">My Simulations</a>
+        <a href="class11.html">Class 11 Topics</a>
+        <a href="class12.html">Class 12 Topics</a>
+        <a href="dashboard.html">Profile</a>
+      </div>
+      <div class="right">
+        <button class="btn" id="themeToggle" type="button">Toggle Theme</button>
+        <a class="btn" href="class11.html">Back</a>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="card">
+        <h2>Gravitation: g vs. height</h2>
+        <p class="text-muted">Compute gravitational acceleration g(h) = GM/(R+h)^2. Adjust mass M, radius R, and height h to see the graph update in real time.</p>
+        <div class="two">
+          <div>
+            <div class="control">
+              <label for="M">Mass M (kg)</label>
+              <input id="M" type="range" min="1e22" max="1e25" step="1e22" value="5.972e24" />
+              <div class="text-muted" id="MOut"></div>
+            </div>
+            <div class="control">
+              <label for="R">Radius R (m)</label>
+              <input id="R" type="range" min="1e6" max="1e8" step="1e6" value="6.371e6" />
+              <div class="text-muted" id="ROut"></div>
+            </div>
+            <div class="control">
+              <label for="hMax">Max height h_max (m)</label>
+              <input id="hMax" type="range" min="0" max="2e7" step="1e5" value="1e7" />
+              <div class="text-muted" id="hOut"></div>
+            </div>
+            <div class="hstack">
+              <button class="btn primary" id="run">Run Simulation</button>
+              <button class="btn" id="reset">Reset</button>
+              <button class="btn" id="save">Save</button>
+              <span id="note" class="text-muted"></span>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="hstack" style="justify-content: space-between;">
+                <div>g(h) (m/s²)</div>
+                <div id="gNow" class="text-muted">—</div>
+              </div>
+              <canvas id="chart" style="width:100%;height:260px"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (btn && window.Theme) btn.addEventListener('click', () => Theme.toggle());
+      });
+    </script>
+    <script type="module">
+      import { ensureAuthAndDb, saveSimulation, makeChart, snapshotCanvas } from './sim-lib.js';
+
+      const G = 6.674e-11;
+      const fmtNum = (n) => new Intl.NumberFormat('en-US',{ maximumFractionDigits: 3 }).format(n);
+
+      const MEl = document.getElementById('M');
+      const REl = document.getElementById('R');
+      const hMaxEl = document.getElementById('hMax');
+      const MOut = document.getElementById('MOut');
+      const ROut = document.getElementById('ROut');
+      const hOut = document.getElementById('hOut');
+      const gNow = document.getElementById('gNow');
+      const runBtn = document.getElementById('run');
+      const resetBtn = document.getElementById('reset');
+      const saveBtn = document.getElementById('save');
+      const note = document.getElementById('note');
+      const chart = makeChart(document.getElementById('chart'), { xLabel:'Height', yLabel:'g', xUnit:'m', yUnit:'m/s²', xMax: 1, yMax: 20 });
+
+      function updateLabels(){
+        MOut.textContent = `M = ${fmtNum(Number(MEl.value))} kg`;
+        ROut.textContent = `R = ${fmtNum(Number(REl.value))} m`;
+        hOut.textContent = `h_max = ${fmtNum(Number(hMaxEl.value))} m`;
+      }
+
+      function computeSeries(){
+        const M = Number(MEl.value), R = Number(REl.value), hMax = Number(hMaxEl.value);
+        const steps = 100; const pts = [];
+        let maxG = 0;
+        for (let i=0;i<=steps;i++){
+          const h = (i/steps)*hMax;
+          const g = G*M/Math.pow(R+h,2);
+          if (g>maxG) maxG = g;
+          pts.push({ x: h, y: g });
+        }
+        return { pts, hMax, maxG };
+      }
+
+      function render(){
+        const { pts, hMax, maxG } = computeSeries();
+        chart.drawAxes = chart.drawAxes; // no-op just to keep reference
+        // Update chart domain
+        const canvas = document.getElementById('chart');
+        const chart2 = makeChart(canvas, { xLabel:'Height', yLabel:'g', xUnit:'m', yUnit:'m/s²', xMax: Math.max(1,hMax), yMax: Math.max(1,maxG*1.1) });
+        chart2.plotSeries([
+          { points: pts, color:'#6aa6ff', markers:true, annotate:(pt,i,p,ctx)=>{ if(i%20===0){ ctx.fillStyle='white'; ctx.fillText(`${fmtNum(pt.x)} m, ${fmtNum(pt.y)} m/s²`, p.x+4, p.y-6);} } }
+        ]);
+        gNow.textContent = `${fmtNum(pts[pts.length-1].y)} m/s² at h=${fmtNum(pts[pts.length-1].x)} m`;
+      }
+
+      MEl.addEventListener('input', () => { updateLabels(); render(); });
+      REl.addEventListener('input', () => { updateLabels(); render(); });
+      hMaxEl.addEventListener('input', () => { updateLabels(); render(); });
+
+      runBtn.addEventListener('click', async () => {
+        // Simple animation from h=0 to h=hMax
+        const { pts } = computeSeries();
+        const canvas = document.getElementById('chart');
+        const hMax = Number(hMaxEl.value);
+        const maxG = Math.max(...pts.map(p=>p.y));
+        const chart2 = makeChart(canvas, { xLabel:'Height', yLabel:'g', xUnit:'m', yUnit:'m/s²', xMax: Math.max(1,hMax), yMax: Math.max(1,maxG*1.1) });
+        let i = 0;
+        function step(){
+          const slice = pts.slice(0, i+1);
+          chart2.plotSeries([{ points: slice, color:'#6aa6ff' }]);
+          if (i < pts.length-1) { i++; requestAnimationFrame(step); }
+        }
+        step();
+      });
+
+      resetBtn.addEventListener('click', () => { updateLabels(); render(); note.textContent=''; });
+
+      saveBtn.addEventListener('click', async () => {
+        note.textContent = 'Saving...';
+        const { auth, db, user } = await ensureAuthAndDb();
+        const params = { M: Number(MEl.value), R: Number(REl.value), hMax: Number(hMaxEl.value) };
+        const { pts } = computeSeries();
+        const snapshot = snapshotCanvas(document.getElementById('chart'));
+        try {
+          await saveSimulation(db, user, {
+            title: 'Gravitation: g vs h', topic: 'Gravitation', params,
+            results: { lastG: pts[pts.length-1] }, snapshot, resumeUrl: window.location.pathname + window.location.search
+          });
+          note.textContent = 'Saved!';
+        } catch (e) {
+          console.error(e); note.textContent = 'Save failed.';
+        }
+      });
+
+      // Init
+      updateLabels(); render();
+    </script>
+  </body>
+</html>
+
