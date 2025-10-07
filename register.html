@@ -45,6 +45,7 @@
     <script type="module">
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
       import { getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { getFirestore, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
       const firebaseConfig = {
         apiKey: 'YOUR_API_KEY',
@@ -57,6 +58,7 @@
 
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
+      const db = getFirestore(app);
       setPersistence(auth, browserLocalPersistence).catch(() => {});
 
       onAuthStateChanged(auth, (user) => { if (user) window.location.replace('index.html'); });
@@ -71,7 +73,13 @@
         e.preventDefault(); errEl.textContent = ''; btn.disabled = true;
         try {
           const email = emailEl.value.trim(); const password = passEl.value;
-          await createUserWithEmailAndPassword(auth, email, password);
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          const user = cred.user;
+          await setDoc(
+            doc(db, 'users', user.uid),
+            { email: user.email || null, createdAt: serverTimestamp() },
+            { merge: true }
+          );
           window.location.replace('index.html');
         } catch (err) {
           console.error(err); errEl.textContent = mapError(err?.code || 'auth/error');
